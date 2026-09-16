@@ -14,6 +14,7 @@ import {
   LogOut,
   Loader2,
 } from 'lucide-react'
+import { EstadoCaja } from '@/components/pos/EstadoCaja'
 
 export default function DashboardLayout({
   children,
@@ -91,6 +92,10 @@ export default function DashboardLayout({
               </p>
             </div>
           </div>
+        </div>
+        {/* Estado de Caja */}
+        <div className="p-4 border-b border-red-800">
+          <EstadoCaja />
         </div>
 
         {/* Menu */}

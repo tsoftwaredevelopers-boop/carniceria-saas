@@ -95,10 +95,10 @@ export function CarritoVenta({ onCobrar }: Props) {
                   <Minus className="w-4 h-4" />
                 </button>
                 <input
-                  type="number"
-                  step="0.001"
+                  type="text"
+                  inputMode="decimal"
                   value={item.peso}
-                  onChange={(e) => actualizarPeso(item.producto_id, parseFloat(e.target.value) || 0)}
+                  onChange={(e) => actualizarPeso(item.producto_id, parseFloat(e.target.value.replace(',', '.')) || 0)}
                   className="w-20 text-center border rounded py-1 text-sm font-mono"
                 />
                 <span className="text-xs text-gray-500">kg</span>
@@ -130,9 +130,10 @@ export function CarritoVenta({ onCobrar }: Props) {
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600 flex-1">Descuento:</label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={descuento || ''}
-              onChange={(e) => setDescuento(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setDescuento(parseFloat(e.target.value.replace(',', '.')) || 0)}
               placeholder="0"
               className="w-24 text-right border rounded px-2 py-1 text-sm"
             />
@@ -190,10 +191,11 @@ export function CarritoVenta({ onCobrar }: Props) {
               {metodoPago === 'efectivo' && (
                 <>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Monto recibido"
                     value={montoEfectivo || ''}
-                    onChange={(e) => setMontos({ montoEfectivo: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setMontos({ montoEfectivo: parseFloat(e.target.value.replace(',', '.')) || 0 })}
                     className="w-full border rounded px-3 py-2 text-right font-mono"
                   />
                   {cambio > 0 && (

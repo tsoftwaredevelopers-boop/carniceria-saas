@@ -4,16 +4,28 @@ import { useState } from 'react'
 import { BuscadorProducto, Producto } from '@/components/pos/BuscadorProducto'
 import { CarritoVenta } from '@/components/pos/CarritoVenta'
 import { useCarritoStore } from '@/stores/carritoStore'
+import { useTurno } from '@/hooks/useTurno'
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner' // Si no lo tienes, quitamos esto después
+import { Lock } from 'lucide-react'
+import Link from 'next/link'
 
 export default function POSPage() {
   const supabase = createClient()
-  const { items, agregarItem, limpiarCarrito, calcularTotal, metodoPago, montoEfectivo, montoTarjeta, montoTransferencia } = useCarritoStore()
+  const { turnoActivo, loading: loadingTurno } = useTurno()
+  const {
+    items,
+    agregarItem,
+    limpiarCarrito,
+    calcularTotal,
+    metodoPago,
+    montoEfectivo,
+    montoTarjeta,
+    montoTransferencia,
+  } = useCarritoStore()
+
   const [procesando, setProcesando] = useState(false)
 
-  async function handleSelectProducto(producto: Producto) {
-    // Agregar con peso por defecto de 1 kg
+  function handleSelectProducto(producto: Producto) {
     agregarItem({
       producto_id: producto.id,
       producto_nombre: producto.nombre,
@@ -24,13 +36,17 @@ export default function POSPage() {
 
   async function handleCobrar() {
     if (items.length === 0) return
+    if (!turnoActivo) {
+      alert('❌ Debes abrir la caja antes de vender')
+      return
+    }
+
     setProcesando(true)
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No hay sesión activa')
 
-      // Obtener tenant_id del usuario
       const { data: usuarioData } = await supabase
         .from('usuarios')
         .select('tenant_id')
@@ -49,19 +65,20 @@ export default function POSPage() {
       if (numError) throw numError
       const numeroVenta = numeroData as number
 
-      // 2. Insertar cabecera de venta
+      // 2. Insertar cabecera de venta CON turno_id
       const { data: ventaData, error: ventaError } = await supabase
         .from('ventas')
         .insert({
           tenant_id: tenantId,
           numero_venta: numeroVenta,
           usuario_id: user.id,
+          turno_id: turnoActivo.id,
           subtotal: calcularTotal(),
           total: total,
           metodo_pago: metodoPago,
-          monto_efectivo: montoEfectivo,
-          monto_tarjeta: montoTarjeta,
-          monto_transferencia: montoTransferencia,
+          monto_efectivo: metodoPago === 'efectivo' || metodoPago === 'mixto' ? total : 0,
+          monto_tarjeta: metodoPago === 'tarjeta' ? total : 0,
+          monto_transferencia: metodoPago === 'transferencia' ? total : 0,
         })
         .select()
         .single()
@@ -85,7 +102,6 @@ export default function POSPage() {
 
       if (detalleError) throw detalleError
 
-      // 4. Éxito
       alert(`✅ Venta #${numeroVenta} registrada\nTotal: $${total.toLocaleString()}`)
       limpiarCarrito()
     } catch (error: any) {
@@ -96,13 +112,53 @@ export default function POSPage() {
     }
   }
 
+  // Pantalla de bloqueo si la caja está cerrada
+  if (!loadingTurno && !turnoActivo) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-10 h-10 text-red-700" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-3">Caja Cerrada</h1>
+          <p className="text-gray-500 mb-8">
+            Para comenzar a vender, primero debes abrir la caja del día.
+          </p>
+          <Link
+            href="/turnos"
+            className="inline-flex items-center justify-center gap-2 w-full bg-red-700 hover:bg-red-800 text-white font-bold py-3 rounded-lg transition"
+          >
+            <Lock className="w-5 h-5" />
+            Ir a Abrir Caja
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadingTurno) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-red-700 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">Verificando estado de caja...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex">
       {/* Buscador - izquierda */}
       <div className="flex-1 flex flex-col">
-        <div className="p-4 bg-red-900 text-white">
-          <h1 className="text-xl font-bold">🥩 Punto de Venta</h1>
-          <p className="text-sm text-red-200">Selecciona los cortes para la venta</p>
+        <div className="p-4 bg-red-900 text-white flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold">🥩 Punto de Venta</h1>
+            <p className="text-sm text-red-200">Selecciona los cortes para la venta</p>
+          </div>
+          <div className="text-right text-sm">
+            <p className="text-red-200">Caja abierta</p>
+          </div>
         </div>
         <BuscadorProducto onSelectProducto={handleSelectProducto} />
       </div>
