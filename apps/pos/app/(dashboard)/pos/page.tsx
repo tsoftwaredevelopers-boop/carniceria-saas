@@ -6,11 +6,13 @@ import { CarritoVenta } from '@/components/pos/CarritoVenta'
 import { useCarritoStore } from '@/stores/carritoStore'
 import { useTurno } from '@/hooks/useTurno'
 import { createClient } from '@/lib/supabase/client'
+import { BuscadorCodigoBarras } from '@/components/pos/BuscadorCodigoBarras'
+import { useSupabase } from '@/hooks/useSupabase'
 import { Lock } from 'lucide-react'
 import Link from 'next/link'
 
 export default function POSPage() {
-  const supabase = createClient()
+  const supabase = useSupabase()
   const { turnoActivo, loading: loadingTurno } = useTurno()
   const {
     items,
@@ -160,6 +162,7 @@ export default function POSPage() {
             <p className="text-red-200">Caja abierta</p>
           </div>
         </div>
+        <BuscadorCodigoBarras onSelectProducto={handleSelectProducto} />
         <BuscadorProducto onSelectProducto={handleSelectProducto} />
       </div>
 

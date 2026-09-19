@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useSupabase } from '@/hooks/useSupabase'
 import {
   Beef,
   ShoppingCart,
@@ -23,7 +24,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
+  const supabase = useSupabase()
   const [loading, setLoading] = useState(true)
   const [usuario, setUsuario] = useState<{ nombre: string; rol: string } | null>(null)
   const [tenantNombre, setTenantNombre] = useState<string>('')

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, Beef, Loader2 } from 'lucide-react'
+import { useSupabase } from '@/hooks/useSupabase'
 
 export interface Producto {
   id: string
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export function BuscadorProducto({ onSelectProducto }: Props) {
-  const supabase = createClient()
+  const supabase = useSupabase()
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<{ id: string; nombre: string; color: string }[]>([])
   const [busqueda, setBusqueda] = useState('')
@@ -37,7 +38,7 @@ export function BuscadorProducto({ onSelectProducto }: Props) {
 
       const { data: prods } = await supabase
         .from('productos')
-        .select('id, nombre, precio_venta_kg, stock_actual, unidad_medida, categoria_id, categorias(nombre, color)')
+        .select('id, nombre, precio_venta_kg, stock_actual, stock_minimo, unidad_medida, categoria_id, categorias(nombre, color)')
         .eq('activo', true)
         .order('nombre')
       setProductos(prods || [])

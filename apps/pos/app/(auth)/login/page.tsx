@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Beef, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useSupabase } from '@/hooks/useSupabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useSupabase()
 
   const [email, setEmail] = useState('admin@donpepe.com')
   const [password, setPassword] = useState('demo123456')

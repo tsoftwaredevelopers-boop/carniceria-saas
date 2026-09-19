@@ -3,9 +3,10 @@
 import { useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useTurnoStore, Turno } from '@/stores/turnoStore'
+import { useSupabase } from '@/hooks/useSupabase'
 
 export function useTurno() {
-  const supabase = createClient()
+  const supabase = useSupabase()
   const { turnoActivo, setTurnoActivo, loading, setLoading, limpiarTurno } = useTurnoStore()
 
   // Cargar el turno activo del usuario logueado
