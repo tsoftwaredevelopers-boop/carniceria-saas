@@ -114,7 +114,13 @@ export function BuscadorProducto({ onSelectProducto }: Props) {
                 key={prod.id}
                 onClick={() => onSelectProducto(prod)}
                 disabled={prod.stock_actual <= 0}
-                className="bg-white border border-gray-200 rounded-lg p-3 text-left hover:border-red-600 hover:shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`bg-white border rounded-lg p-3 text-left transition ${
+                  prod.stock_actual <= 0
+                    ? 'opacity-40 cursor-not-allowed border-gray-200'
+                    : prod.stock_actual <= prod.stock_minimo
+                      ? 'border-yellow-400 hover:border-yellow-600 hover:shadow-md'
+                      : 'border-gray-200 hover:border-red-600 hover:shadow-md'
+                }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <p className="font-semibold text-gray-800 text-sm leading-tight line-clamp-2">
@@ -135,8 +141,20 @@ export function BuscadorProducto({ onSelectProducto }: Props) {
                   ${prod.precio_venta_kg.toLocaleString()}
                   <span className="text-xs text-gray-500 font-normal"> /kg</span>
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Stock: {prod.stock_actual.toFixed(2)} kg
+                <p className={`text-xs mt-1 flex items-center gap-1 ${
+                  prod.stock_actual <= 0 
+                    ? 'text-red-600 font-semibold' 
+                    : prod.stock_actual <= prod.stock_minimo
+                      ? 'text-yellow-600 font-medium'
+                      : 'text-gray-500'
+                  }`}>
+                  {prod.stock_actual <= 0 ? (
+                    <>❌ Sin stock</>
+                  ) : prod.stock_actual <= prod.stock_minimo ? (
+                    <>⚠️ Stock bajo: {prod.stock_actual.toFixed(2)} kg</>
+                  ) : (
+                    <>Stock: {prod.stock_actual.toFixed(2)} kg</>
+                  )}
                 </p>
               </button>
             ))}

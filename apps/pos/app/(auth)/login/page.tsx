@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Beef, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,11 +27,17 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message)
+      toast.error('Error al iniciar sesión', {
+        description: error.message,
+      })
       setLoading(false)
       return
     }
 
     if (data.user) {
+      toast.success('¡Bienvenido!', {
+        description: `Sesión iniciada como ${data.user.email}`,
+      })
       router.push('/pos')
       router.refresh()
     }
