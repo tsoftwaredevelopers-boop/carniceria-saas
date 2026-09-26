@@ -10,6 +10,7 @@ import { BuscadorCodigoBarras } from '@/components/pos/BuscadorCodigoBarras'
 import { useSupabase } from '@/hooks/useSupabase'
 import { Lock } from 'lucide-react'
 import Link from 'next/link'
+import { TicketVenta } from '@/components/pos/TicketVenta'
 
 export default function POSPage() {
   const supabase = useSupabase()
@@ -26,6 +27,7 @@ export default function POSPage() {
   } = useCarritoStore()
 
   const [procesando, setProcesando] = useState(false)
+  const [ventaParaTicket, setVentaParaTicket] = useState<any>(null)
 
   function handleSelectProducto(producto: Producto) {
     agregarItem({
@@ -104,7 +106,26 @@ export default function POSPage() {
 
       if (detalleError) throw detalleError
 
-      alert(`✅ Venta #${numeroVenta} registrada\nTotal: $${total.toLocaleString()}`)
+      // Guardar los datos del ticket para mostrarlo en el modal
+      setVentaParaTicket({
+        numeroVenta,
+        fecha: new Date().toLocaleString('es-AR'),
+        cajero: user.email || 'Cajero',
+        tenant: {
+          nombre_comercial: 'Carnicería Don Pepe', // TODO: Cargar dinámicamente
+          direccion: 'Av. Principal #123',
+          telefono: '+54 11 1234-5678',
+          ruc_nit: '12345678901',
+        },
+        items: [...items],
+        subtotal: calcularTotal(),
+        descuento: 0,
+        total,
+        metodoPago,
+        montoRecibido: montoEfectivo,
+        cambio: montoEfectivo > total ? montoEfectivo - total : 0,
+      })
+
       limpiarCarrito()
     } catch (error: any) {
       console.error(error)
@@ -164,6 +185,12 @@ export default function POSPage() {
         </div>
         <BuscadorCodigoBarras onSelectProducto={handleSelectProducto} />
         <BuscadorProducto onSelectProducto={handleSelectProducto} />
+          {ventaParaTicket && (
+          <TicketVenta
+            venta={ventaParaTicket}
+            onClose={() => setVentaParaTicket(null)}
+          />
+        )}
       </div>
 
       {/* Carrito - derecha */}
