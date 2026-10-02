@@ -5,22 +5,36 @@ import { useReportes, ProductoMasVendido } from '@/hooks/useReportes'
 import { RankingProductos } from '@/components/reportes/RankingProductos'
 import { GraficoProductos } from '@/components/reportes/GraficoProductos'
 import { Loader2, Package, TrendingUp, DollarSign, Weight } from 'lucide-react'
+import { TablaGanancias } from '@/components/reportes/TablaGanancias'
+import { AlertasStock } from '@/components/reportes/AlertasStock'
+import { GananciaProducto, StockBajo } from '@/hooks/useReportes'
 
 export default function ProductosPage() {
-  const { obtenerProductosMasVendidos } = useReportes()
+  const { obtenerProductosMasVendidos, obtenerGanancias, obtenerStockBajo, obtenerValorInventario } = useReportes()
 
   const [productos, setProductos] = useState<ProductoMasVendido[]>([])
   const [cargando, setCargando] = useState(true)
+  const [ganancias, setGanancias] = useState<GananciaProducto[]>([])
+  const [stockBajo, setStockBajo] = useState<StockBajo[]>([])
+  const [valorInventario, setValorInventario] = useState<{costo: number; venta: number; gananciaPotencial: number} | null>(null)
 
   const cargarDatos = useCallback(async () => {
     setCargando(true)
     try {
-      const data = await obtenerProductosMasVendidos(50)
-      setProductos(data)
+      const [productosData, gananciasData, stockData, inventarioData] = await Promise.all([
+        obtenerProductosMasVendidos(50),
+        obtenerGanancias(50),
+        obtenerStockBajo(),
+        obtenerValorInventario(),
+      ])
+      setProductos(productosData)
+      setGanancias(gananciasData)
+      setStockBajo(stockData)
+      setValorInventario(inventarioData)
     } finally {
       setCargando(false)
     }
-  }, [obtenerProductosMasVendidos])
+  }, [obtenerProductosMasVendidos, obtenerGanancias, obtenerStockBajo, obtenerValorInventario])
 
   useEffect(() => {
     cargarDatos()
@@ -130,6 +144,11 @@ export default function ProductosPage() {
               <GraficoProductos datos={productos} metrica="kg" />
               <GraficoProductos datos={productos} metrica="facturacion" />
             </div>
+            {/* Tabla de ganancias */}
+            <TablaGanancias datos={ganancias} limite={15} />
+
+            {/* Alertas de stock */}
+            <AlertasStock datos={stockBajo} valorInventario={valorInventario || undefined} />
           </>
         )}
       </div>
