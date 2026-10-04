@@ -19,7 +19,7 @@ import { toast } from 'sonner'
 
 export default function AdminPage() {
   const supabase = useSupabase()
-  const { listarTenants, cambiarEstado, extenderTrial, calcularMetricas, loading } = useAdmin()
+  const { listarTenants, cambiarEstado, cambiarPlan, extenderTrial, calcularMetricas, loading } = useAdmin()
 
   const [esSuperAdmin, setEsSuperAdmin] = useState<boolean | null>(null)
   const [tenants, setTenants] = useState<AdminTenant[]>([])
@@ -94,7 +94,27 @@ export default function AdminPage() {
       setAccionando(null)
     }
   }
+  // Acción: cambiar plan
+  async function handleCambiarPlan(tenant: AdminTenant, nuevoPlan: string) {
+    if (nuevoPlan === tenant.plan_id) return
 
+    if (!confirm(`¿Cambiar el plan de ${tenant.nombre_comercial} a ${nuevoPlan.toUpperCase()}?`)) {
+      return
+    }
+
+    setAccionando(tenant.id)
+    try {
+      const ok = await cambiarPlan(tenant.id, nuevoPlan)
+      if (ok) {
+        toast.success(`Plan cambiado a ${nuevoPlan.toUpperCase()}`)
+        await cargarTenants()
+      } else {
+        toast.error('Error al cambiar plan')
+      }
+    } finally {
+      setAccionando(null)
+    }
+  }
   // Acción: extender trial
   async function handleExtenderTrial(tenant: AdminTenant) {
     if (!confirm(`¿Extender 30 días de trial a ${tenant.nombre_comercial}?`)) return
@@ -297,9 +317,16 @@ export default function AdminPage() {
                           <div className="text-xs text-gray-400">{t.email_contacto}</div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 uppercase">
-                            {t.plan_id}
-                          </span>
+                          <select
+                            value={t.plan_id}
+                            onChange={(e) => handleCambiarPlan(t, e.target.value)}
+                            disabled={accionando === t.id}
+                            className="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 uppercase border-none cursor-pointer hover:bg-blue-200 transition disabled:opacity-50"
+                          >
+                            <option value="basico">BÁSICO</option>
+                            <option value="pro">PRO</option>
+                            <option value="premium">PREMIUM</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
