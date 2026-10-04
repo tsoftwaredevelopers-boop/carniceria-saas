@@ -95,22 +95,27 @@ export function useTurno() {
       .eq('turno_id', turnoActivo.id)
       .eq('estado', 'completada')
 
-    const totales = {
-      efectivo: 0,
-      tarjeta: 0,
-      transferencia: 0,
-    }
-
-    ;(ventasTurno || []).forEach((v: any) => {
-      if (v.metodo_pago === 'efectivo') totales.efectivo += Number(v.monto_efectivo || v.total)
-      else if (v.metodo_pago === 'tarjeta') totales.tarjeta += Number(v.monto_tarjeta || v.total)
-      else if (v.metodo_pago === 'transferencia') totales.transferencia += Number(v.monto_transferencia || v.total)
-      else if (v.metodo_pago === 'mixto') {
-        totales.efectivo += Number(v.monto_efectivo || 0)
-        totales.tarjeta += Number(v.monto_tarjeta || 0)
-        totales.transferencia += Number(v.monto_transferencia || 0)
+        const totales = {
+        efectivo: 0,
+        tarjeta: 0,
+        transferencia: 0,
+        total: 0,
+        cantidadVentas: 0,
       }
-    })
+
+      ;(ventasTurno || []).forEach((v: any) => {
+        totales.total += Number(v.total)
+        totales.cantidadVentas += 1
+
+        if (v.metodo_pago === 'efectivo') totales.efectivo += Number(v.monto_efectivo || v.total)
+        else if (v.metodo_pago === 'tarjeta') totales.tarjeta += Number(v.monto_tarjeta || v.total)
+        else if (v.metodo_pago === 'transferencia') totales.transferencia += Number(v.monto_transferencia || v.total)
+        else if (v.metodo_pago === 'mixto') {
+          totales.efectivo += Number(v.monto_efectivo || 0)
+          totales.tarjeta += Number(v.monto_tarjeta || 0)
+          totales.transferencia += Number(v.monto_transferencia || 0)
+        }
+      })
 
     // Efectivo esperado = monto inicial + ventas en efectivo
     const efectivoEsperado = turnoActivo.monto_inicial + totales.efectivo
@@ -135,6 +140,47 @@ export function useTurno() {
     limpiarTurno()
     return { turno: data as Turno, totales, efectivoEsperado, diferencia }
   }
+
+    // Listar turnos cerrados (historial)
+    const listarTurnosCerrados = useCallback(
+      async (limite: number = 20) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+            // Silencioso: no loguear, no es un error, simplemente no hay sesión
+            return []
+          }
+
+          const { data: usuarioData, error: errorUsuario } = await supabase
+            .from('usuarios')
+            .select('tenant_id')
+            .eq('id', user.id)
+            .single()
+
+          if (errorUsuario || !usuarioData) {
+            return []
+          }
+
+          const { data, error } = await supabase
+            .from('turnos')
+            .select('*')
+            .eq('tenant_id', usuarioData.tenant_id)
+            .eq('estado', 'cerrado')
+            .order('fecha_cierre', { ascending: false })
+            .limit(limite)
+
+          if (error) {
+            // Silencioso si es un error de sesión
+            return []
+          }
+
+          return (data || []) as Turno[]
+        } catch {
+          return []
+        }
+      },
+      [supabase]
+    )
 
   // Obtener estadísticas del turno activo
   async function obtenerEstadisticasTurno() {
@@ -179,6 +225,7 @@ export function useTurno() {
     abrirCaja,
     cerrarCaja,
     obtenerEstadisticasTurno,
+    listarTurnosCerrados,
     recargar: cargarTurnoActivo,
   }
 }

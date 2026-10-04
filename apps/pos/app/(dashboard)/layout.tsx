@@ -25,8 +25,14 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const supabase = useSupabase()
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [usuario, setUsuario] = useState<{ nombre: string; rol: string } | null>(null)
   const [tenantNombre, setTenantNombre] = useState<string>('')
+
+  // Marcar como montado cuando el cliente se hidrate
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     async function verificar() {
@@ -36,7 +42,6 @@ export default function DashboardLayout({
         return
       }
 
-      // 1. Cargar datos del usuario
       const { data, error } = await supabase
         .from('usuarios')
         .select(`
@@ -59,28 +64,33 @@ export default function DashboardLayout({
         // @ts-ignore
         setTenantNombre(data.tenants?.nombre_comercial || '')
 
-        // 2. Verificar suscripción (solo si NO es super_admin)
-        if (data.rol !== 'super_admin') {
-          const { data: sub, error: errorSub } = await supabase.rpc(
-            'verificar_suscripcion',
-            { p_tenant_id: data.tenant_id }
-          )
-
-          if (errorSub) {
-            console.error('Error verificando suscripción:', errorSub)
+        // Si es super_admin, redirigir a /admin
+        if (data.rol === 'super_admin') {
+          if (pathname !== '/admin') {
+            router.push('/admin')
           }
+          setLoading(false)
+          return
+        }
 
-          const suscripcion = sub as any
+        // Si es cliente normal, verificar suscripción
+        const { data: sub, error: errorSub } = await supabase.rpc(
+          'verificar_suscripcion',
+          { p_tenant_id: data.tenant_id }
+        )
 
-          // Si la suscripción NO está activa, redirigir
-          if (suscripcion && !suscripcion.activo) {
-            // Evitar loop si ya estamos en la página de vencida
-            if (pathname !== '/suscripcion-vencida') {
-              router.push('/suscripcion-vencida')
-            }
-            setLoading(false)
-            return
+        if (errorSub) {
+          console.error('Error verificando suscripción:', errorSub)
+        }
+
+        const suscripcion = sub as any
+
+        if (suscripcion && !suscripcion.activo) {
+          if (pathname !== '/suscripcion-vencida') {
+            router.push('/suscripcion-vencida')
           }
+          setLoading(false)
+          return
         }
       }
 
@@ -88,15 +98,21 @@ export default function DashboardLayout({
     }
 
     verificar()
-    }, [router, supabase])
+  }, [router, supabase, pathname])
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+    async function handleLogout() {
+      try {
+        await supabase.auth.signOut()
+      } catch (err) {
+        console.error('Error cerrando sesión:', err)
+      }
+      // Redirigir y recargar para limpiar estado
+      router.push('/login')
+      router.refresh()
+    }
 
-  if (loading) {
+  // No renderizar hasta que el cliente esté montado
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -107,13 +123,10 @@ export default function DashboardLayout({
     )
   }
 
-  // Menú condicional según el rol
   const esSuperAdmin = usuario?.rol === 'super_admin'
 
   const menuItems = esSuperAdmin
-    ? [
-        { href: '/admin', label: 'Panel de Administración', icon: Package },
-      ]
+    ? [{ href: '/admin', label: 'Panel de Administración', icon: Package }]
     : [
         { href: '/pos', label: 'Punto de Venta', icon: ShoppingCart },
         { href: '/productos', label: 'Productos', icon: Package },
@@ -141,7 +154,6 @@ export default function DashboardLayout({
           </div>
         </div>
 
-        {/* Solo mostrar EstadoCaja para clientes, no para super_admin */}
         {!esSuperAdmin && (
           <div className="p-4 border-b border-red-800">
             <EstadoCaja />

@@ -23,6 +23,7 @@ export default function TurnosPage() {
     abrirCaja,
     cerrarCaja,
     obtenerEstadisticasTurno,
+    listarTurnosCerrados,
     recargar,
   } = useTurno()
 
@@ -39,15 +40,36 @@ export default function TurnosPage() {
   const [montoDeclarado, setMontoDeclarado] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [resultadoCierre, setResultadoCierre] = useState<any>(null)
+  const [turnosCerrados, setTurnosCerrados] = useState<any[]>([])
 
   // Cargar stats cuando hay turno activo
-  useEffect(() => {
-    if (turnoActivo) {
-      obtenerEstadisticasTurno().then(setStats)
-    } else {
+    useEffect(() => {
+    // No hacer nada si no hay turno activo
+    if (!turnoActivo) {
       setStats(null)
+      return
     }
-  }, [turnoActivo, obtenerEstadisticasTurno])
+
+    let cancelado = false
+
+    async function cargar() {
+      const statsData = await obtenerEstadisticasTurno()
+      if (!cancelado) {
+        setStats(statsData)
+      }
+
+      const turnosData = await listarTurnosCerrados(20)
+      if (!cancelado) {
+        setTurnosCerrados(turnosData)
+      }
+    }
+
+    cargar()
+
+    return () => {
+      cancelado = true
+    }
+  }, [turnoActivo?.id, obtenerEstadisticasTurno, listarTurnosCerrados])
 
   async function handleAbrirCaja(e: React.FormEvent) {
     e.preventDefault()
@@ -85,6 +107,9 @@ export default function TurnosPage() {
       })
 
       setResultadoCierre(resultado)
+       // Recargar historial
+      const turnosActualizados = await listarTurnosCerrados(20)
+      setTurnosCerrados(turnosActualizados)
       setMostrarCierre(false)
       setMontoDeclarado('')
       setObservaciones('')
@@ -421,33 +446,39 @@ export default function TurnosPage() {
             </h2>
 
             <form onSubmit={handleCerrarCaja} className="space-y-6">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                  💡 Ingresa el monto de efectivo que tienes <strong>físicamente</strong> en la caja.
+              {/* Info + Efectivo esperado */}
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-5">
+                <p className="text-sm text-yellow-800 mb-4">
+                  💡 Contá el efectivo <strong>físicamente</strong> en caja e ingresalo abajo.
                   El sistema calculará la diferencia automáticamente.
                 </p>
-              </div>
 
-              {stats && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Efectivo esperado:</span>
-                    <span className="font-mono font-semibold">
-                      ${(stats.efectivoEsperado || 0).toLocaleString()}
+                {stats && (
+                  <div className="flex justify-between items-center bg-white rounded-lg px-4 py-3 shadow-sm">
+                    <span className="text-sm font-medium text-gray-600">
+                      Efectivo esperado
+                    </span>
+                    <span className="font-mono font-bold text-xl text-gray-900">
+                      ${Number(stats.efectivoEsperado || 0).toLocaleString('es-AR')}
                     </span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
+              {/* Input de monto declarado */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label
+                  htmlFor="montoDeclarado"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
+                >
                   Efectivo físico en caja *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-2xl font-light">
                     $
                   </span>
                   <input
+                    id="montoDeclarado"
                     type="text"
                     inputMode="decimal"
                     value={montoDeclarado}
@@ -455,24 +486,73 @@ export default function TurnosPage() {
                     placeholder="0.00"
                     autoFocus
                     required
-                    className="w-full pl-10 pr-4 py-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-2xl font-mono text-right"
+                    className="w-full pl-10 pr-4 py-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-2xl font-mono text-right text-gray-900"
                   />
                 </div>
+
+                {/* Diferencia en vivo */}
+                {(() => {
+                  const montoNum = parseFloat(montoDeclarado)
+                  const esperadoNum = Number(stats?.efectivoEsperado || 0)
+                  const dif = montoNum - esperadoNum
+
+                  // No mostrar si no hay monto escrito o no hay efectivo esperado
+                  if (!montoDeclarado || isNaN(montoNum) || esperadoNum === 0) {
+                    return null
+                  }
+
+                  const cuadra = Math.abs(dif) < 0.01
+
+                  return (
+                    <div
+                      className={`mt-3 flex items-center justify-between p-3 rounded-lg border-2 ${
+                        cuadra
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-yellow-50 border-yellow-200'
+                      }`}
+                    >
+                      <span
+                        className={`text-sm font-semibold ${
+                          cuadra ? 'text-green-800' : 'text-yellow-800'
+                        }`}
+                      >
+                        {cuadra
+                          ? '✓ Cuadra perfecto'
+                          : dif > 0
+                            ? '↑ Sobrante'
+                            : '↓ Faltante'}
+                      </span>
+                      <span
+                        className={`font-mono font-bold ${
+                          cuadra ? 'text-green-700' : 'text-yellow-700'
+                        }`}
+                      >
+                        ${Math.abs(dif).toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
 
+              {/* Observaciones */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label
+                  htmlFor="observaciones"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
+                >
                   Observaciones (opcional)
                 </label>
                 <textarea
+                  id="observaciones"
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
                   placeholder="Ej: Faltante por error en vuelto, etc."
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none text-gray-900"
                 />
               </div>
 
+              {/* Error */}
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -480,6 +560,7 @@ export default function TurnosPage() {
                 </div>
               )}
 
+              {/* Botones */}
               <div className="flex gap-3">
                 <button
                   type="button"
