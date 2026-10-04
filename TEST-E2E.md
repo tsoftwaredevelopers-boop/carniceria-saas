@@ -23,8 +23,14 @@
 | 10 | Registro de merma | ✅ |
 | 11 | Actualización automática de stock | ✅ |
 | 12 | Cierre de caja (Corte Z) | ✅ |
-| 13 | Historial de cierres | ✅ |
-| 14 | Diferencia en vivo (Corte Z) | ✅ |
+#### 13. Historial de cierres
+- **Acción:** Ver sección "📋 Historial de Cierres" al final de `/turnos`
+- **Resultado:** ✅ Muestra los turnos cerrados con:
+  - Fecha y hora de cierre
+  - Monto inicial, monto final
+  - Diferencia (verde si cuadra, amarillo si no)
+  - Botón "Actualizar" para refrescar
+- **Fix aplicado:** Se agregó la sección al JSX (faltaba) y se resolvió el loop infinito usando `useRef` para las funciones del hook| 14 | Diferencia en vivo (Corte Z) | ✅ |
 | 15 | Reportes de ventas | ✅ |
 | 16 | Ranking de productos | ✅ |
 | 17 | Ganancias por producto | ✅ |
