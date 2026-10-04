@@ -1,2 +1,5 @@
 .env.local
 .env
+*.bak
+*.tmp
+*.log
