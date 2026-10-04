@@ -37,17 +37,30 @@ export default function DashboardLayout({
         return
       }
 
-      const { data: usuarioData } = await supabase
-        .from('usuarios')
-        .select('nombre, rol, tenants(nombre_comercial)')
-        .eq('id', user.id)
+      const { data: usuarioData, error: errorUsuario } = await supabase
+      .from('usuarios')
+      .select('nombre, rol, tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    if (errorUsuario) {
+      console.error('Error cargando usuario:', errorUsuario)
+    }
+
+    if (usuarioData) {
+      setUsuario({ nombre: usuarioData.nombre, rol: usuarioData.rol })
+
+      // Cargar el nombre del tenant por separado
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('nombre_comercial')
+        .eq('id', usuarioData.tenant_id)
         .single()
 
-      if (usuarioData) {
-        setUsuario({ nombre: usuarioData.nombre, rol: usuarioData.rol })
-        // @ts-ignore
-        setTenantNombre(usuarioData.tenants?.nombre_comercial || '')
+      if (tenantData) {
+        setTenantNombre(tenantData.nombre_comercial)
       }
+    }
 
       setLoading(false)
     }
