@@ -71,9 +71,23 @@ export const useCarritoStore = create<CarritoState>((set, get) => ({
   },
 
   eliminarItem: (producto_id) => {
-    set((state) => ({
-      items: state.items.filter(i => i.producto_id !== producto_id),
-    }))
+    set((state) => {
+      const nuevosItems = state.items.filter(i => i.producto_id !== producto_id)
+      
+      // Si el carrito queda vacío, limpiar descuento, método de pago y montos
+      if (nuevosItems.length === 0) {
+        return {
+          items: [],
+          descuento: 0,
+          metodoPago: 'efectivo',
+          montoEfectivo: 0,
+          montoTarjeta: 0,
+          montoTransferencia: 0,
+        }
+      }
+      
+      return { items: nuevosItems }
+    })
   },
 
   limpiarCarrito: () => {

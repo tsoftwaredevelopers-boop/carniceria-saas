@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCarritoStore } from '@/stores/carritoStore'
 import { Minus, Plus, Trash2, ShoppingCart, DollarSign } from 'lucide-react'
 
@@ -27,12 +27,32 @@ export function CarritoVenta({ onCobrar }: Props) {
 
   const [mostrarPago, setMostrarPago] = useState(false)
 
+  // Estados locales para inputs de texto (evitan perder el punto/coma al escribir)
+  const [pesosLocales, setPesosLocales] = useState<Record<string, string>>({})
+  const [descuentoLocal, setDescuentoLocal] = useState<string>('')
+  const [montoEfectivoLocal, setMontoEfectivoLocal] = useState<string>('')
+  // Limpiar los estados locales cuando el carrito se vacía
+  useEffect(() => {
+    if (items.length === 0) {
+      setPesosLocales({})
+      setDescuentoLocal('')
+      setMontoEfectivoLocal('')
+      setMostrarPago(false) // También cerramos el formulario de pago
+    }
+  }, [items.length])
+
   const subtotal = calcularSubtotal()
   const total = calcularTotal()
   const cambio = montoEfectivo > total ? montoEfectivo - total : 0
 
   function handleIncrementar(producto_id: string, pesoActual: number) {
     actualizarPeso(producto_id, pesoActual + 0.1)
+    // Limpiar el estado local para que se sincronice con el store
+    setPesosLocales((prev) => {
+      const copia = { ...prev }
+      delete copia[producto_id]
+      return copia
+    })
   }
 
   function handleDecrementar(producto_id: string, pesoActual: number) {
@@ -42,6 +62,59 @@ export function CarritoVenta({ onCobrar }: Props) {
     } else {
       actualizarPeso(producto_id, nuevo)
     }
+    setPesosLocales((prev) => {
+      const copia = { ...prev }
+      delete copia[producto_id]
+      return copia
+    })
+  }
+
+  function handlePesoChange(producto_id: string, texto: string) {
+    const limpio = texto.replace(',', '.')
+    setPesosLocales((prev) => ({ ...prev, [producto_id]: limpio }))
+
+    const num = parseFloat(limpio)
+    if (!isNaN(num) && num > 0) {
+      actualizarPeso(producto_id, num)
+    }
+  }
+
+  function handlePesoBlur(producto_id: string) {
+    setPesosLocales((prev) => {
+      const copia = { ...prev }
+      delete copia[producto_id]
+      return copia
+    })
+  }
+
+  function handleDescuentoChange(texto: string) {
+    const limpio = texto.replace(',', '.')
+    setDescuentoLocal(limpio)
+    const num = parseFloat(limpio)
+    if (!isNaN(num) && num >= 0) {
+      setDescuento(num)
+    } else if (limpio === '') {
+      setDescuento(0)
+    }
+  }
+
+  function handleDescuentoBlur() {
+    setDescuentoLocal('')
+  }
+
+  function handleMontoEfectivoChange(texto: string) {
+    const limpio = texto.replace(',', '.')
+    setMontoEfectivoLocal(limpio)
+    const num = parseFloat(limpio)
+    if (!isNaN(num) && num >= 0) {
+      setMontos({ montoEfectivo: num })
+    } else if (limpio === '') {
+      setMontos({ montoEfectivo: 0 })
+    }
+  }
+
+  function handleMontoEfectivoBlur() {
+    setMontoEfectivoLocal('')
   }
 
   return (
@@ -97,9 +170,10 @@ export function CarritoVenta({ onCobrar }: Props) {
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={item.peso}
-                  onChange={(e) => actualizarPeso(item.producto_id, parseFloat(e.target.value.replace(',', '.')) || 0)}
-                  className="w-20 text-center border rounded py-1 text-sm font-mono"
+                  value={pesosLocales[item.producto_id] ?? String(item.peso)}
+                  onChange={(e) => handlePesoChange(item.producto_id, e.target.value)}
+                  onBlur={() => handlePesoBlur(item.producto_id)}
+                  className="w-20 text-center border rounded py-1 text-sm font-mono text-gray-900"
                 />
                 <span className="text-xs text-gray-500">kg</span>
                 <button
@@ -132,10 +206,11 @@ export function CarritoVenta({ onCobrar }: Props) {
             <input
               type="text"
               inputMode="decimal"
-              value={descuento || ''}
-              onChange={(e) => setDescuento(parseFloat(e.target.value.replace(',', '.')) || 0)}
+              value={descuentoLocal || (descuento > 0 ? String(descuento) : '')}
+              onChange={(e) => handleDescuentoChange(e.target.value)}
+              onBlur={handleDescuentoBlur}
               placeholder="0"
-              className="w-24 text-right border rounded px-2 py-1 text-sm"
+              className="w-24 text-right border rounded px-2 py-1 text-sm font-mono text-gray-900"
             />
           </div>
 
@@ -194,9 +269,10 @@ export function CarritoVenta({ onCobrar }: Props) {
                     type="text"
                     inputMode="decimal"
                     placeholder="Monto recibido"
-                    value={montoEfectivo || ''}
-                    onChange={(e) => setMontos({ montoEfectivo: parseFloat(e.target.value.replace(',', '.')) || 0 })}
-                    className="w-full border rounded px-3 py-2 text-right font-mono"
+                    value={montoEfectivoLocal || (montoEfectivo > 0 ? String(montoEfectivo) : '')}
+                    onChange={(e) => handleMontoEfectivoChange(e.target.value)}
+                    onBlur={handleMontoEfectivoBlur}
+                    className="w-full border rounded px-3 py-2 text-right font-mono text-gray-900"
                   />
                   {cambio > 0 && (
                     <div className="flex justify-between text-sm bg-green-50 p-2 rounded">
