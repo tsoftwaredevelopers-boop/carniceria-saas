@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useRef, useState } from 'react'
+import { useSupabase } from '@/hooks/useSupabase'
 import { Producto } from '@/components/pos/BuscadorProducto'
 import { Scan, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,13 +11,13 @@ interface Props {
 }
 
 export function BuscadorCodigoBarras({ onSelectProducto }: Props) {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useSupabase()
   const [codigo, setCodigo] = useState('')
   const [estado, setEstado] = useState<'idle' | 'success' | 'error'>('idle')
   const [mensaje, setMensaje] = useState('')
+  const [tenantId, setTenantId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Focus automático al montar y cada vez que se pierde el focus
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
@@ -28,10 +28,29 @@ export function BuscadorCodigoBarras({ onSelectProducto }: Props) {
 
     const codigoLimpio = codigo.trim()
 
-    // Buscar producto por código de barras
+    // Obtener tenant_id
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      toast.error('No hay sesión activa')
+      return
+    }
+
+    const { data: usuarioData } = await supabase
+      .from('usuarios')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuarioData) {
+      toast.error('Usuario no encontrado')
+      return
+    }
+
+    // Buscar producto por código Y tenant (SEGURIDAD EXTRA)
     const { data, error } = await supabase
       .from('productos')
       .select('id, nombre, precio_venta_kg, stock_actual, stock_minimo, unidad_medida, categoria_id, codigo_barras')
+      .eq('tenant_id', usuarioData.tenant_id)
       .eq('codigo_barras', codigoLimpio)
       .eq('activo', true)
       .maybeSingle()
@@ -68,7 +87,6 @@ export function BuscadorCodigoBarras({ onSelectProducto }: Props) {
       return
     }
 
-    // Agregar al carrito
     onSelectProducto(data as Producto)
     setEstado('success')
     setMensaje(`✓ ${data.nombre}`)
@@ -78,10 +96,7 @@ export function BuscadorCodigoBarras({ onSelectProducto }: Props) {
     })
     setCodigo('')
 
-    // Volver al estado idle después de 1.5s
     setTimeout(() => setEstado('idle'), 1500)
-
-    // Refocus para el siguiente escaneo
     inputRef.current?.focus()
   }
 
@@ -92,28 +107,27 @@ export function BuscadorCodigoBarras({ onSelectProducto }: Props) {
           <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
             <Scan className="w-5 h-5 text-gray-400" />
           </div>
-            <input
-              ref={inputRef}
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleSubmit(e as any)
-                }
-              }}
-              placeholder="🔍 Escanear código de barras o escribir y presionar Enter..."
-              autoComplete="off"
-              className={`w-full pl-11 pr-24 py-3 border-2 rounded-lg outline-none transition font-mono ${
-                estado === 'success'
-                  ? 'border-green-500 bg-green-50'
-                  : estado === 'error'
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-600/20'
-              }`}
-            />
-          {/* Indicador de estado */}
+          <input
+            ref={inputRef}
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                handleSubmit(e as any)
+              }
+            }}
+            placeholder="🔍 Escanear código de barras o escribir y presionar Enter..."
+            autoComplete="off"
+            className={`w-full pl-11 pr-24 py-3 border-2 rounded-lg outline-none transition font-mono text-gray-900 ${
+              estado === 'success'
+                ? 'border-green-500 bg-green-50'
+                : estado === 'error'
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-300 focus:border-red-600 focus:ring-2 focus:ring-red-600/20'
+            }`}
+          />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
             {estado === 'success' && (
               <>

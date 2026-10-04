@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/hooks/useSupabase'
 import {
   Beef,
@@ -30,42 +29,66 @@ export default function DashboardLayout({
   const [tenantNombre, setTenantNombre] = useState<string>('')
 
   useEffect(() => {
-    async function cargarUsuario() {
+    async function verificar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
         return
       }
 
-      const { data: usuarioData, error: errorUsuario } = await supabase
-      .from('usuarios')
-      .select('nombre, rol, tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (errorUsuario) {
-      console.error('Error cargando usuario:', errorUsuario)
-    }
-
-    if (usuarioData) {
-      setUsuario({ nombre: usuarioData.nombre, rol: usuarioData.rol })
-
-      // Cargar el nombre del tenant por separado
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('nombre_comercial')
-        .eq('id', usuarioData.tenant_id)
+      // 1. Cargar datos del usuario
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select(`
+          nombre,
+          rol,
+          tenant_id,
+          tenants (nombre_comercial)
+        `)
+        .eq('id', user.id)
         .single()
 
-      if (tenantData) {
-        setTenantNombre(tenantData.nombre_comercial)
+      if (error) {
+        console.error('Error cargando usuario:', error)
+        setLoading(false)
+        return
       }
-    }
+
+      if (data) {
+        setUsuario({ nombre: data.nombre, rol: data.rol })
+        // @ts-ignore
+        setTenantNombre(data.tenants?.nombre_comercial || '')
+
+        // 2. Verificar suscripción (solo si NO es super_admin)
+        if (data.rol !== 'super_admin') {
+          const { data: sub, error: errorSub } = await supabase.rpc(
+            'verificar_suscripcion',
+            { p_tenant_id: data.tenant_id }
+          )
+
+          if (errorSub) {
+            console.error('Error verificando suscripción:', errorSub)
+          }
+
+          const suscripcion = sub as any
+
+          // Si la suscripción NO está activa, redirigir
+          if (suscripcion && !suscripcion.activo) {
+            // Evitar loop si ya estamos en la página de vencida
+            if (pathname !== '/suscripcion-vencida') {
+              router.push('/suscripcion-vencida')
+            }
+            setLoading(false)
+            return
+          }
+        }
+      }
 
       setLoading(false)
     }
-    cargarUsuario()
-  }, [router, supabase])
+
+    verificar()
+    }, [router, supabase])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -76,43 +99,55 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-red-700" />
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-red-700 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Verificando acceso...</p>
+        </div>
       </div>
     )
   }
 
-  const menuItems = [
-    { href: '/pos', label: 'Punto de Venta', icon: ShoppingCart },
-    { href: '/productos', label: 'Productos', icon: Package },
-    { href: '/ventas', label: 'Ventas', icon: Receipt },
-    { href: '/turnos', label: 'Turnos / Caja', icon: Wallet },
-    { href: '/mermas', label: 'Mermas', icon: Trash2 },
-  ]
+  // Menú condicional según el rol
+  const esSuperAdmin = usuario?.rol === 'super_admin'
+
+  const menuItems = esSuperAdmin
+    ? [
+        { href: '/admin', label: 'Panel de Administración', icon: Package },
+      ]
+    : [
+        { href: '/pos', label: 'Punto de Venta', icon: ShoppingCart },
+        { href: '/productos', label: 'Productos', icon: Package },
+        { href: '/ventas', label: 'Ventas', icon: Receipt },
+        { href: '/turnos', label: 'Turnos / Caja', icon: Wallet },
+        { href: '/mermas', label: 'Mermas', icon: Trash2 },
+      ]
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
       <aside className="w-64 bg-red-900 text-white flex flex-col shadow-xl">
-        {/* Logo */}
         <div className="p-6 border-b border-red-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
               <Beef className="w-6 h-6 text-red-700" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg leading-tight">Carnicería</h1>
-              <p className="text-xs text-red-200 truncate max-w-[140px]">
-                {tenantNombre || 'SaaS'}
+            <div className="min-w-0 flex-1">
+              <h1 className="font-bold text-sm leading-tight truncate">
+                {esSuperAdmin ? 'Carnicería SaaS' : (tenantNombre || 'Carnicería SaaS')}
+              </h1>
+              <p className="text-xs text-red-200">
+                {esSuperAdmin ? 'Panel Admin' : 'Sistema POS'}
               </p>
             </div>
           </div>
         </div>
-        {/* Estado de Caja */}
-        <div className="p-4 border-b border-red-800">
-          <EstadoCaja />
-        </div>
 
-        {/* Menu */}
+        {/* Solo mostrar EstadoCaja para clientes, no para super_admin */}
+        {!esSuperAdmin && (
+          <div className="p-4 border-b border-red-800">
+            <EstadoCaja />
+          </div>
+        )}
+
         <nav className="flex-1 p-4 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon
@@ -134,10 +169,9 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* User Footer */}
         <div className="p-4 border-t border-red-800">
           <div className="mb-3">
-            <p className="text-sm font-semibold">{usuario?.nombre}</p>
+            <p className="text-sm font-semibold truncate">{usuario?.nombre}</p>
             <p className="text-xs text-red-200 capitalize">{usuario?.rol}</p>
           </div>
           <button
@@ -150,10 +184,7 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   )
 }

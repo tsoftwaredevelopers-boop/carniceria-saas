@@ -2,17 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Beef, Loader2 } from 'lucide-react'
+import { Beef, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSupabase } from '@/hooks/useSupabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = useSupabase()
+  const supabase = createClient()
 
-  const [email, setEmail] = useState('admin@donpepe.com')
-  const [password, setPassword] = useState('demo123456')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,16 +36,30 @@ export default function LoginPage() {
     }
 
     if (data.user) {
-      toast.success('¡Bienvenido!', {
-        description: `Sesión iniciada como ${data.user.email}`,
-      })
-      router.push('/pos')
+      // Verificar el rol del usuario para redirigir correctamente
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('rol')
+        .eq('id', data.user.id)
+        .single()
+
+      if (usuario?.rol === 'super_admin') {
+        toast.success('¡Bienvenido!', {
+          description: 'Acceso al panel de administración',
+        })
+        router.push('/admin')
+      } else {
+        toast.success('¡Bienvenido!', {
+          description: `Sesión iniciada como ${data.user.email}`,
+        })
+        router.push('/pos')
+      }
       router.refresh()
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-900 via-red-800 to-red-950 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-900 via-red-800 to-red-950 px-4 py-8">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
@@ -69,7 +83,10 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Correo electrónico
               </label>
               <input
@@ -78,14 +95,18 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition"
+                autoComplete="email"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition text-gray-900"
                 placeholder="tu@carniceria.com"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Contraseña
               </label>
               <input
@@ -94,15 +115,17 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition"
+                autoComplete="current-password"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none transition text-gray-900"
                 placeholder="••••••••"
               />
             </div>
 
             {/* Error */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <span className="text-sm">{error}</span>
               </div>
             )}
 
@@ -123,13 +146,16 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Credenciales demo */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center mb-2">
-              🔑 Credenciales de prueba:
-            </p>
-            <p className="text-xs text-gray-600 text-center font-mono">
-              admin@donpepe.com / demo123456
+          {/* Link a registro */}
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <p className="text-sm text-gray-600">
+              ¿No tenés cuenta?{' '}
+              <Link
+                href="/registro"
+                className="text-red-700 font-semibold hover:underline"
+              >
+                Registrá tu carnicería
+              </Link>
             </p>
           </div>
         </div>
