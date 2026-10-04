@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 export default function AdminPage() {
   const supabase = useSupabase()
   const { listarTenants, cambiarEstado, cambiarPlan, extenderTrial, calcularMetricas, loading } = useAdmin()
+  const [suspendiendoVencidos, setSuspendiendoVencidos] = useState(false)
 
   const [esSuperAdmin, setEsSuperAdmin] = useState<boolean | null>(null)
   const [tenants, setTenants] = useState<AdminTenant[]>([])
@@ -92,6 +93,36 @@ export default function AdminPage() {
       }
     } finally {
       setAccionando(null)
+    }
+  }
+  // Acción: suspender tenants vencidos (ejecuta la función SQL)
+  async function handleSuspenderVencidos() {
+    if (!confirm('¿Suspender todas las carnicerías con trial/suscripción vencidos hace más de 7 días?')) {
+      return
+    }
+
+    setSuspendiendoVencidos(true)
+    try {
+      const { data, error } = await supabase.rpc('suspender_tenants_vencidos')
+
+      if (error) throw error
+
+      const suspendidos = data as Array<{ tenant_id: string; nombre_comercial: string; razon: string }>
+
+      if (suspendidos && suspendidos.length > 0) {
+        toast.success(`${suspendidos.length} carnicería(s) suspendida(s)`, {
+          description: suspendidos.map(s => s.nombre_comercial).join(', '),
+        })
+        await cargarTenants()
+      } else {
+        toast.info('No hay carnicerías vencidas para suspender')
+      }
+    } catch (err: any) {
+      toast.error('Error al suspender vencidos', {
+        description: err.message,
+      })
+    } finally {
+      setSuspendiendoVencidos(false)
     }
   }
   // Acción: cambiar plan
@@ -175,6 +206,24 @@ export default function AdminPage() {
               Gestión de carnicerías registradas en el sistema
             </p>
           </div>
+          <button
+            onClick={handleSuspenderVencidos}
+            disabled={suspendiendoVencidos}
+            className="text-sm text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 px-4 py-2 rounded-lg flex items-center gap-2 transition"
+            title="Suspende automáticamente las carnicerías vencidas hace más de 7 días"
+          >
+            {suspendiendoVencidos ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Ban className="w-4 h-4" />
+                Suspender Vencidos
+              </>
+            )}
+          </button>
           <button
             onClick={cargarTenants}
             className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-300 flex items-center gap-2 transition"
