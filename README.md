@@ -179,3 +179,6 @@ DEPLOY.md - Guía de deploy a producción
 Propietario - Todos los derechos reservados.
 
 Desarrollado con ❤️ para carnicerías 🥩
+---
+
+**Desarrollado con ❤️ en Calilegua, Jujuy, Argentina** 🇦🇷

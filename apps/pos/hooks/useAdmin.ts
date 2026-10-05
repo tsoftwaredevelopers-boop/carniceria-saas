@@ -56,15 +56,37 @@ export function useAdmin() {
   }, [supabase])
 
   // Cambiar estado de un tenant
-  const cambiarEstado = useCallback(
+    const cambiarEstado = useCallback(
     async (tenantId: string, nuevoEstado: AdminTenant['status']) => {
       setLoading(true)
       setError(null)
 
       try {
+        const updateData: any = { status: nuevoEstado }
+
+        // Si se reactiva, asignar 30 días si no tiene fecha futura
+        if (nuevoEstado === 'active') {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('current_period_ends_at')
+            .eq('id', tenantId)
+            .single()
+
+          const vencimiento = tenant?.current_period_ends_at
+            ? new Date(tenant.current_period_ends_at)
+            : null
+
+          // Si no tiene fecha o ya venció, asignar 30 días desde hoy
+          if (!vencimiento || vencimiento < new Date()) {
+            const nuevaFecha = new Date()
+            nuevaFecha.setDate(nuevaFecha.getDate() + 30)
+            updateData.current_period_ends_at = nuevaFecha.toISOString()
+          }
+        }
+
         const { error: err } = await supabase
           .from('tenants')
-          .update({ status: nuevoEstado })
+          .update(updateData)
           .eq('id', tenantId)
 
         if (err) throw err
